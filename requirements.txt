@@ -1,0 +1,10 @@
+streamlit
+pandas
+qreader
+paddlepaddle==2.6.2
+paddleocr==2.7.0.3
+requests
+beautifulsoup4
+selenium
+numpy==1.26.4
+opencv-python-headless==4.9.0.80
