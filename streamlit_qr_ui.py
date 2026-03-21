@@ -26,7 +26,7 @@ import streamlit as st
 #JWT_SECRET = "kantaka_secret"
 
 #query = st.query_params
-t#oken = query.get("token")
+#token = query.get("token")
 
 #if not token:
  #   st.error("Unauthorized Access")
