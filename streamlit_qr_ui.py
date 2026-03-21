@@ -11,7 +11,6 @@ import cv2
 import pandas as pd
 import re
 import tempfile
-from qreader import QReader
 from paddleocr import PaddleOCR  
 import requests
 from bs4 import BeautifulSoup
@@ -357,8 +356,20 @@ def generate_clean_exact_match_df(ocr_df, app_df):
     return result_df
 
 def decode_qr(image):
+    import os
+
+    # 🔥 Force writable path
+    weights_path = "/tmp/qrdet_weights"
+    os.makedirs(weights_path, exist_ok=True)
+
+    # 🔥 Set BEFORE importing QReader
+    os.environ["QRDET_WEIGHTS_FOLDER"] = weights_path
+
+    from qreader import QReader   # ✅ import INSIDE function
+
     detector = QReader()
     decoded_qrs, _ = detector.detect_and_decode(image=image, return_detections=True)
+
     return decoded_qrs[0] if decoded_qrs else None
 
 def extract_with_requests(url):
