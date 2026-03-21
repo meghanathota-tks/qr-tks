@@ -378,41 +378,47 @@ def decode_qr(image):
 
 def extract_with_selenium(url):
     try:
-        from selenium import webdriver
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        import time
+        from selenium.webdriver.chrome.options import Options
 
-        options = webdriver.ChromeOptions()
+        options = Options()
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
 
+        # IMPORTANT: Use system chromium (for Streamlit Cloud / Docker)
+        options.binary_location = "/usr/bin/chromium"
+
         driver = webdriver.Chrome(options=options)
 
         driver.get(url)
 
-        # Wait for full page load
-        WebDriverWait(driver, 25).until(
+        WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.TAG_NAME, "body"))
         )
 
-        # Give time for JS rendering
-        time.sleep(5)
-
-        # Extract full visible text
-        page_text = driver.find_element(By.TAG_NAME, "body").text
-
+        page_source = driver.page_source
         driver.quit()
 
-        # Convert text → structured format
+        soup = BeautifulSoup(page_source, "html.parser")
+
         data = []
-        for line in page_text.split("\n"):
-            if ":" in line:
-                key, val = line.split(":", 1)
-                data.append((key.strip(), val.strip()))
+
+        # Try multiple patterns (VERY IMPORTANT)
+        for row in soup.find_all("tr"):
+            cells = row.find_all(["td", "th"])
+            if len(cells) == 2:
+                data.append((
+                    cells[0].get_text(strip=True),
+                    cells[1].get_text(strip=True)
+                ))
+
+        if not data:
+            for tag in soup.find_all(["div", "span", "p"]):
+                text = tag.get_text(strip=True)
+                if ":" in text:
+                    k, v = text.split(":", 1)
+                    data.append((k.strip(), v.strip()))
 
         return pd.DataFrame(data, columns=["Field", "Value"]) if data else None
 
@@ -519,7 +525,7 @@ with col_right:
                 st.write("📄 Extracting Portal Data...", url)
 
 # Step 1: Try normal extraction
-                app_df = extract_data(url)
+                aapp_df = extract_with_selenium(url)
 
 # Step 2: If fails → use Selenium (MANDATORY for CRS)
                 if app_df is None or app_df.empty:
