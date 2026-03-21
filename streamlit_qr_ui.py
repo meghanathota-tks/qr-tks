@@ -22,20 +22,16 @@ detector = QReader(weights_folder=_TEMP_WEIGHTS_DIR)
 # Instantiate PaddleOCR once to avoid repeated heavy initialisation.
 # Wrap in try/except so import-time errors are surfaced cleanly.
 try:
-    ocr = PaddleOCR(use_angle_cls=True, lang='en')
+    global ocr
+    if ocr is None:
+        ocr = PaddleOCR(use_angle_cls=True, lang='en')
 except Exception as _e:
     # If OCR fails to initialize at import, keep 'ocr' as None and handle later.
     ocr = None
 import requests
 from bs4 import BeautifulSoup
 
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import WebDriverException, TimeoutException
+
 #import jwt
 import streamlit as st
 
@@ -367,6 +363,7 @@ def generate_clean_exact_match_df(ocr_df, app_df):
 
     result_df = app_df.copy()
     result_df[['result', 'matched_text']] = result_df['Value'].apply(match_row)
+
     return result_df
 
 def decode_qr(image):
@@ -379,60 +376,65 @@ def decode_qr(image):
     return decoded_qrs[0] if decoded_qrs else None
 
 
-def extract_with_requests(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
+def extract_data(url):
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json,text/html"
+    }
+
     try:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
 
-        soup = BeautifulSoup(response.content, "html.parser")
+        # 🔥 Try JSON first (many portals use this)
+        try:
+            json_data = response.json()
+            data = []
+
+            def flatten(d, parent=''):
+                for k, v in d.items():
+                    key = f"{parent} {k}".strip()
+                    if isinstance(v, dict):
+                        flatten(v, key)
+                    else:
+                        data.append((key, str(v)))
+
+            flatten(json_data)
+
+            if data:
+                return pd.DataFrame(data, columns=["Field", "Value"])
+
+        except:
+            pass
+
+        # 🔥 Fallback: HTML parsing
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        data = []
+
+        # Table parsing
         rows = soup.select("table tr")
-
-        data = []
         for row in rows:
-            cells = row.find_all("td")
+            cells = row.find_all(["td", "th"])
             if len(cells) == 2:
-                key = cells[0].get_text(strip=True)
-                val = cells[1].get_text(strip=True)
-                data.append((key, val))
+                data.append((
+                    cells[0].get_text(strip=True),
+                    cells[1].get_text(strip=True)
+                ))
+
+        # Div/text fallback
+        if not data:
+            for tag in soup.find_all(["div", "p", "span"]):
+                text = tag.get_text(strip=True)
+                if ":" in text:
+                    k, v = text.split(":", 1)
+                    data.append((k.strip(), v.strip()))
 
         return pd.DataFrame(data, columns=["Field", "Value"]) if data else None
-    except requests.RequestException:
+
+    except Exception as e:
+        print("Extraction error:", e)
         return None
-
-def extract_with_selenium(url):
-    try:
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        
-
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-
-        driver.get(url)
-
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.XPATH, "//table//tr"))
-        )
-
-        rows = driver.find_elements(By.XPATH, "//table//tr")
-
-        data = []
-        for row in rows:
-            cells = row.find_elements(By.TAG_NAME, "td")
-            if len(cells) == 2:
-                key = cells[0].text.strip()
-                val = cells[1].text.strip()  # Fixed: was 'text.strip()'
-                data.append((key, val))
-
-        driver.quit()
-
-        return pd.DataFrame(data, columns=["Field", "Value"]) if data else None
-    except (WebDriverException, TimeoutException):
-        return None
-
 # ---------------- HTML Table Generator ----------------
 def generate_html_table(df):
     """Generates a beautiful glassmorphism HTML table from the matched dataframe"""
