@@ -534,9 +534,7 @@ with col_right:
                     st.stop()
 
                 st.write("📄 Extracting Portal Data...")
-                app_df = extract_with_requests(url)
-                if app_df is None or app_df.empty:
-                    app_df = extract_with_selenium(url)
+                app_df = extract_data(url)
 
                 if app_df is None or app_df.empty:
                     status.update(label="Extraction Failed", state="error", expanded=True)
