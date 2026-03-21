@@ -376,64 +376,48 @@ def decode_qr(image):
     return decoded_qrs[0] if decoded_qrs else None
 
 
-def extract_data(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json,text/html"
-    }
-
+def extract_with_selenium(url):
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
+        from selenium import webdriver
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        import time
 
-        # 🔥 Try JSON first (many portals use this)
-        try:
-            json_data = response.json()
-            data = []
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
 
-            def flatten(d, parent=''):
-                for k, v in d.items():
-                    key = f"{parent} {k}".strip()
-                    if isinstance(v, dict):
-                        flatten(v, key)
-                    else:
-                        data.append((key, str(v)))
+        driver = webdriver.Chrome(options=options)
 
-            flatten(json_data)
+        driver.get(url)
 
-            if data:
-                return pd.DataFrame(data, columns=["Field", "Value"])
+        # Wait for full page load
+        WebDriverWait(driver, 25).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
 
-        except:
-            pass
+        # Give time for JS rendering
+        time.sleep(5)
 
-        # 🔥 Fallback: HTML parsing
-        soup = BeautifulSoup(response.text, "html.parser")
+        # Extract full visible text
+        page_text = driver.find_element(By.TAG_NAME, "body").text
 
+        driver.quit()
+
+        # Convert text → structured format
         data = []
-
-        # Table parsing
-        rows = soup.select("table tr")
-        for row in rows:
-            cells = row.find_all(["td", "th"])
-            if len(cells) == 2:
-                data.append((
-                    cells[0].get_text(strip=True),
-                    cells[1].get_text(strip=True)
-                ))
-
-        # Div/text fallback
-        if not data:
-            for tag in soup.find_all(["div", "p", "span"]):
-                text = tag.get_text(strip=True)
-                if ":" in text:
-                    k, v = text.split(":", 1)
-                    data.append((k.strip(), v.strip()))
+        for line in page_text.split("\n"):
+            if ":" in line:
+                key, val = line.split(":", 1)
+                data.append((key.strip(), val.strip()))
 
         return pd.DataFrame(data, columns=["Field", "Value"]) if data else None
 
     except Exception as e:
-        print("Extraction error:", e)
+        print("Selenium error:", e)
         return None
 # ---------------- HTML Table Generator ----------------
 def generate_html_table(df):
@@ -532,13 +516,20 @@ with col_right:
                     status.update(label="No QR Code Found", state="error", expanded=True)
                     st.error("No valid QR code was detected in the uploaded image.")
                     st.stop()
-
                 st.write("📄 Extracting Portal Data...", url)
+
+# Step 1: Try normal extraction
                 app_df = extract_data(url)
 
+# Step 2: If fails → use Selenium (MANDATORY for CRS)
+                if app_df is None or app_df.empty:
+                    st.warning("⚠️ Switching to advanced browser extraction...")
+                    app_df = extract_with_selenium(url)
+
+# Step 3: Final check
                 if app_df is None or app_df.empty:
                     status.update(label="Extraction Failed", state="error", expanded=True)
-                    st.error("Failed to extract data from the QR destination page.")
+                    st.error("❌ CRS site blocked extraction. Unable to fetch data.")
                     st.stop()
 
                 # Clean Place of Death
