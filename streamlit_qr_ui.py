@@ -525,7 +525,7 @@ with col_right:
                 st.write("📄 Extracting Portal Data...", url)
 
 # Step 1: Try normal extraction
-                aapp_df = extract_with_selenium(url)
+                app_df = extract_with_selenium(url)
 
 # Step 2: If fails → use Selenium (MANDATORY for CRS)
                 if app_df is None or app_df.empty:
