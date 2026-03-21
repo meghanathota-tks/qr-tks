@@ -3,15 +3,29 @@ import os
 # Disable connectivity check + force CPU
 os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-os.environ["QRDET_WEIGHTS_FOLDER"] = "/tmp/qrdet_weights"
-os.environ["YOLO_CONFIG_DIR"] = "/tmp"
+
 
 import streamlit as st
 import cv2
 import pandas as pd
 import re
 import tempfile
-from paddleocr import PaddleOCR  
+from qreader import QReader
+from paddleocr import PaddleOCR 
+ # Use OS temp directory (e.g. /tmp on Linux) which Streamlit Cloud allows writing to.
+_TEMP_WEIGHTS_DIR = tempfile.gettempdir()
+
+# Instantiate detector once (loads / downloads weights into _TEMP_WEIGHTS_DIR).
+# This prevents repeated downloads and avoids permission problems trying to create system dirs.
+detector = QReader(weights_folder=_TEMP_WEIGHTS_DIR)
+
+# Instantiate PaddleOCR once to avoid repeated heavy initialisation.
+# Wrap in try/except so import-time errors are surfaced cleanly.
+try:
+    ocr = PaddleOCR(use_angle_cls=True, lang='en')
+except Exception as _e:
+    # If OCR fails to initialize at import, keep 'ocr' as None and handle later.
+    ocr = None
 import requests
 from bs4 import BeautifulSoup
 
@@ -356,33 +370,14 @@ def generate_clean_exact_match_df(ocr_df, app_df):
     return result_df
 
 def decode_qr(image):
-    detector = cv2.QRCodeDetector()
+    """
+    Use the module-level 'detector' (QReader) which was created using
+    tempfile.gettempdir() for weights_folder to avoid permission issues.
+    """
+    # Use the pre-created detector (no re-instantiation here)
+    decoded_qrs, _ = detector.detect_and_decode(image=image, return_detections=True)
+    return decoded_qrs[0] if decoded_qrs else None
 
-    # 1️⃣ Try original
-    data, bbox, _ = detector.detectAndDecode(image)
-    if data:
-        return data
-
-    # 2️⃣ Try grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    data, bbox, _ = detector.detectAndDecode(gray)
-    if data:
-        return data
-
-    # 3️⃣ Try threshold (very important)
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-    data, bbox, _ = detector.detectAndDecode(thresh)
-    if data:
-        return data
-
-    # 4️⃣ Try resized (zoom in)
-    scale = 2
-    resized = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    data, bbox, _ = detector.detectAndDecode(resized)
-    if data:
-        return data
-
-    return None
 
 def extract_with_requests(url):
     headers = {"User-Agent": "Mozilla/5.0"}
