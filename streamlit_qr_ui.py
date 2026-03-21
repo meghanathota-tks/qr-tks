@@ -357,9 +357,32 @@ def generate_clean_exact_match_df(ocr_df, app_df):
 
 def decode_qr(image):
     detector = cv2.QRCodeDetector()
-    data, bbox, _ = detector.detectAndDecode(image)
 
-    return data if data else None
+    # 1️⃣ Try original
+    data, bbox, _ = detector.detectAndDecode(image)
+    if data:
+        return data
+
+    # 2️⃣ Try grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    data, bbox, _ = detector.detectAndDecode(gray)
+    if data:
+        return data
+
+    # 3️⃣ Try threshold (very important)
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+    data, bbox, _ = detector.detectAndDecode(thresh)
+    if data:
+        return data
+
+    # 4️⃣ Try resized (zoom in)
+    scale = 2
+    resized = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    data, bbox, _ = detector.detectAndDecode(resized)
+    if data:
+        return data
+
+    return None
 
 def extract_with_requests(url):
     headers = {"User-Agent": "Mozilla/5.0"}
