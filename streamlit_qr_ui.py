@@ -25,28 +25,28 @@ import streamlit as st
 #import jwt
 #JWT_SECRET = "kantaka_secret"
 
-query = st.query_params
-token = query.get("token")
+#query = st.query_params
+t#oken = query.get("token")
 
-if not token:
-    st.error("Unauthorized Access")
-    st.stop()
+#if not token:
+ #   st.error("Unauthorized Access")
+  #  st.stop()
 
-try:
-    jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-except jwt.ExpiredSignatureError:
-    st.error("Token expired")
-    st.stop()
-except:
-    st.error("Invalid token")
-    st.stop()
+#try:
+ #   jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+#except jwt.ExpiredSignatureError:
+ #   st.error("Token expired")
+  #  st.stop()
+#except:
+ #   st.error("Invalid token")
+  #  st.stop()
 # ---------------- page config ----------------
-st.set_page_config(
-    page_title="Kantaka Sodhana : QR Verification", 
-    layout="wide", 
-    initial_sidebar_state="collapsed",
-    page_icon="🛡️"
-)
+#st.set_page_config(
+   # page_title="Kantaka Sodhana : QR Verification", 
+  #  layout="wide", 
+ #   initial_sidebar_state="collapsed",
+#   page_icon="🛡️"
+#)
 
 # ---------------- CSS (Enhanced Glassmorphism & Theme) ----------------
 st.markdown("""
