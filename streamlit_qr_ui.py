@@ -3,6 +3,8 @@ import os
 # Disable connectivity check + force CPU
 os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["QRDET_WEIGHTS_FOLDER"] = "/tmp/qrdet_weights"
+os.environ["YOLO_CONFIG_DIR"] = "/tmp"
 
 import streamlit as st
 import cv2
@@ -21,8 +23,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException, TimeoutException
-import streamlit as st
 #import jwt
+import streamlit as st
+
 #JWT_SECRET = "kantaka_secret"
 
 #query = st.query_params
