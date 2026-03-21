@@ -533,7 +533,7 @@ with col_right:
                     st.error("No valid QR code was detected in the uploaded image.")
                     st.stop()
 
-                st.write("📄 Extracting Portal Data...")
+                st.write("📄 Extracting Portal Data...", url)
                 app_df = extract_data(url)
 
                 if app_df is None or app_df.empty:
