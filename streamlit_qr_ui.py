@@ -21,10 +21,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException, TimeoutException
-import jwt
 import streamlit as st
-
-JWT_SECRET = "kantaka_secret"
+#import jwt
+#JWT_SECRET = "kantaka_secret"
 
 query = st.query_params
 token = query.get("token")
